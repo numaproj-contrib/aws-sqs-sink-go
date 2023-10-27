@@ -33,6 +33,9 @@ data:
                 value: "test-queue" # Replace with aws sqs queue name
               - name: AWS_REGION
                 value: "eu-north-1" # Replace with aws sqs queue region
+              - name: AWS_BASE_ENDPOINT
+                # Base endpoint of AWS
+                value: "http://moto.numaflow-system.svc.cluster.local:5000"
             envFrom:
               - secretRef:
                   name: aws-secret # Replace with k8s secret name created earlier

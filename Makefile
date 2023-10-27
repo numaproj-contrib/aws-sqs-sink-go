@@ -22,3 +22,13 @@ lint:
 
 clean:
 	-rm -rf ./dist
+
+# E2E Tests
+
+install-numaflow:
+	kubectl create ns numaflow-system
+	kubectl apply -n numaflow-system -f https://raw.githubusercontent.com/numaproj/numaflow/stable/config/install.yaml
+
+test-e2e:
+	go generate $(shell find ./test/sqs-e2e* -name '*.go')
+	go test -v -timeout 15m -count 1 --tags test -p 1 ./test/sqs-e2e*
