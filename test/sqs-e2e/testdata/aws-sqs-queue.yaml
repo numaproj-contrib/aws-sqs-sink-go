@@ -1,0 +1,43 @@
+apiVersion: numaflow.numaproj.io/v1alpha1
+kind: Pipeline
+metadata:
+  name: simple-pipeline
+spec:
+  vertices:
+    - name: in
+      source:
+        generator:
+          rpu: 5
+          duration: 5s
+    - name: cat
+      udf:
+        builtin:
+          name: cat
+    - name: out
+      sink:
+        log: {}
+    - name: aws-sink
+      scale:
+        min: 1
+      sink:
+        udsink:
+          container:
+            image: quay.io/numaio/numaproj-contrib/aws-sqs-sink-go:v0.0.5
+            env:
+              - name: AWS_SQS_QUEUE_NAME
+                value: "testing"
+              - name: AWS_REGION
+                value: "us-east-1"
+              - name: AWS_ACCESS_KEY
+                value: "testing" ## This can be passed as k8s secret as well
+              - name: AWS_ACCESS_SECRET
+                value: "testing" # ## This can be passed as k8s secret as well
+              - name: AWS_BASE_ENDPOINT
+                value: "http://moto.numaflow-system.svc.cluster.local:5000"
+  edges:
+    - from: in
+      to: cat
+    - from: cat
+      to: out
+    - from: cat
+      to: aws-sink

@@ -34,6 +34,7 @@ type awsSQSSink struct {
 	region          string
 	awsAccessKey    string
 	awsAccessSecret string
+	awsBaseEndpoint string
 }
 
 // newAWSSQSSink will read the environment variable required to authenticate aws and publish data to SQS
@@ -62,17 +63,24 @@ func newAWSSQSSink() *awsSQSSink {
 		region:          region,
 		awsAccessKey:    accessKey,
 		awsAccessSecret: accessSecret,
+		awsBaseEndpoint: os.Getenv("AWS_BASE_ENDPOINT"),
 	}
 }
 
 // awsSQSClient will generate the aws sqs client using access_key, access_secret and region.
 func (s *awsSQSSink) awsSQSClient() *sqs.Client {
-	awsConfig := aws.Config{
+	config := aws.Config{
 		Region:      s.region,
 		Credentials: credentials.NewStaticCredentialsProvider(s.awsAccessKey, s.awsAccessSecret, ""),
 	}
 
-	return sqs.NewFromConfig(awsConfig)
+	if s.awsBaseEndpoint != "" {
+		return sqs.NewFromConfig(config, func(options *sqs.Options) {
+			options.BaseEndpoint = aws.String(s.awsBaseEndpoint)
+		})
+	}
+
+	return sqs.NewFromConfig(config)
 }
 
 // Sink will publish the vertex data to aws sqs sink
@@ -82,7 +90,7 @@ func (s *awsSQSSink) Sink(ctx context.Context, datumStreamCh <-chan sinksdk.Datu
 	// generate the queue url to publish data to queue via queue name.
 	queueURL, err := s.sqsClient.GetQueueUrl(ctx, &sqs.GetQueueUrlInput{QueueName: &s.queueName})
 	if err != nil {
-		s.logger.Fatalln("failed to generate SQS Queue url, err: %v", err)
+		s.logger.Fatalln("failed to generate SQS Queue url, err: ", err)
 	}
 
 	// range over data stream and publish data to aws sqs queue
