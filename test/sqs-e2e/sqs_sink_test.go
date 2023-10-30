@@ -23,7 +23,7 @@ import (
 	"testing"
 	"time"
 
-	. "github.com/numaproj-contrib/aws-sqs-sink-go/test/fixtures"
+	. "github.com/numaproj-contrib/numaflow-utils-go/testing/fixtures"
 	"github.com/stretchr/testify/suite"
 )
 
