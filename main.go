@@ -28,8 +28,8 @@ import (
 	"go.uber.org/zap"
 )
 
-var (
-	SQSQueueName   = "AWS_SQS_QUEUE_NAME"
+const (
+	sqsQueueName   = "AWS_SQS_QUEUE_NAME"
 	awsEndpointURL = "AWS_ENDPOINT_URL"
 )
 
@@ -71,9 +71,10 @@ func awsSQSClient(ctx context.Context) *awsSQSSink {
 // Sink will publish the vertex data to aws sqs sink
 func (s *awsSQSSink) Sink(ctx context.Context, datumStreamCh <-chan sinksdk.Datum) sinksdk.Responses {
 	ok := sinksdk.ResponsesBuilder()
+	failed := sinksdk.ResponsesBuilder()
 
 	// generate the queue url to publish data to queue via queue name.
-	queueURL, err := s.sqsClient.GetQueueUrl(ctx, &sqs.GetQueueUrlInput{QueueName: aws.String(os.Getenv(SQSQueueName))})
+	queueURL, err := s.sqsClient.GetQueueUrl(ctx, &sqs.GetQueueUrlInput{QueueName: aws.String(os.Getenv(sqsQueueName))})
 	if err != nil {
 		s.logger.Fatalln("failed to generate SQS Queue url, err: ", err)
 	}
@@ -94,16 +95,21 @@ func (s *awsSQSSink) Sink(ctx context.Context, datumStreamCh <-chan sinksdk.Datu
 	})
 	if err != nil {
 		s.logger.Errorf("failed to push message %v", err)
-	} else {
-		// check for response in case of partial failure, then log those responses otherwise return id of success request.
-		if len(response.Failed) > 0 {
-			s.logger.Error("failed to push message, err: %v", response.Failed)
+	}
+
+	// log the failure response and return the ID of that.
+	if len(response.Failed) > 0 {
+		s.logger.Error("failed to push message, err: %v", response.Failed)
+
+		for _, fail := range response.Failed {
+			failed = failed.Append(sinksdk.ResponseFailure(aws.ToString(fail.Id), "failed to "))
 		}
-		if len(response.Successful) > 0 {
-			for _, success := range response.Successful {
-				ok = ok.Append(sinksdk.ResponseOK(aws.ToString(success.Id)))
-			}
-		}
+
+		return failed
+	}
+
+	for _, success := range response.Successful {
+		ok = ok.Append(sinksdk.ResponseOK(aws.ToString(success.Id)))
 	}
 
 	return ok

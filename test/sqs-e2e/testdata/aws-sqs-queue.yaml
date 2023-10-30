@@ -9,13 +9,6 @@ spec:
         generator:
           rpu: 5
           duration: 5s
-    - name: cat
-      udf:
-        builtin:
-          name: cat
-    - name: out
-      sink:
-        log: {}
     - name: aws-sink
       scale:
         min: 1
@@ -36,8 +29,4 @@ spec:
                 value: "http://moto.numaflow-system.svc.cluster.local:5000"
   edges:
     - from: in
-      to: cat
-    - from: cat
-      to: out
-    - from: cat
       to: aws-sink

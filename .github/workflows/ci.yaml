@@ -116,6 +116,7 @@ jobs:
       - name: "step 8: Run E2E tests"
         env:
           KUBECONFIG: "~/.kube/numaflow-e2e-config"
+          # These values are for moto configuration, ref: https://docs.getmoto.org/en/latest/
           AWS_REGION: "us-east-1"
           AWS_ACCESS_KEY_ID: "testing"
           AWS_SECRET_ACCESS_KEY: "testing"

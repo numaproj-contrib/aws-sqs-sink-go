@@ -1,5 +1,3 @@
-//go:build test
-
 /*
 Copyright 2023 The Numaproj Authors.
 
@@ -37,6 +35,7 @@ func (a *AWSSQSSuite) TestAWSSQSSinkPipeline() {
 
 	a.T().Log("port forwarding moto service")
 	stopPortForward := a.StartPortForward("moto-0", 5000)
+	defer stopPortForward()
 
 	client, err := awsSQSClient(ctx)
 	a.NoError(err)
@@ -59,9 +58,6 @@ func (a *AWSSQSSuite) TestAWSSQSSinkPipeline() {
 	a.NoError(err)
 
 	a.True(containMsg)
-
-	// stop the port forwarding of moto service
-	stopPortForward()
 }
 
 func TestAWSSQSSinkPipelineSuite(t *testing.T) {
