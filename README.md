@@ -3,20 +3,8 @@
 AWS SQS Sink for Numaflow implemented in Golang, which will push the vertex data to AWS SQS.
 
 ### Environment Variables
-	AWS_SQS_QUEUE_NAME      : AWS SQS Queue name for push the vertex data
-	AWS_REGION              : Region for AWS SQS 
 
-### Secret Variables
-```yaml
-apiVersion: v1
-kind: Secret
-metadata:
-  name: aws-secret
-type: Opaque
-data:
-  AWS_ACCESS_KEY: "<BASE_64_OF_AWS_ACCESS_KEY>" # Replace with aws access key in base64 format
-  AWS_ACCESS_SECRET: "<BASE_64_AWS_ACCESS_SECRET>" # Replace with aws access secret in base64 format
-```
+Specify the environment variables based on the supported envs specified here https://aws.github.io/aws-sdk-go-v2/docs/configuring-sdk/#specifying-credentials
 
 ### Example Pipeline Configuration
 
@@ -27,17 +15,15 @@ data:
       sink:
         udsink:
           container:
-            image: quay.io/numaio/numaflow-sink/aws-sqs-sink:v0.0.3
+            image: quay.io/numaio/numaflow-sink/aws-sqs-sink:v0.0.1
             env:
               - name: AWS_SQS_QUEUE_NAME
-                value: "test-queue" # Replace with aws sqs queue name
+                value: "test"
               - name: AWS_REGION
-                value: "eu-north-1" # Replace with aws sqs queue region
-              - name: AWS_BASE_ENDPOINT
-                # Base endpoint of AWS
-                value: "http://moto.numaflow-system.svc.cluster.local:5000"
-            envFrom:
-              - secretRef:
-                  name: aws-secret # Replace with k8s secret name created earlier
+                value: "us-east-1"
+              - name: AWS_ACCESS_KEY_ID
+                value: "testing" ## This can be passed as k8s secret as well
+              - name: AWS_SECRET_ACCESS_KEY
+                value: "testing" # ## This can be passed as k8s secret as well
 ```
     

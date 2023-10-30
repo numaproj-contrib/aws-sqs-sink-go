@@ -20,7 +20,7 @@ import (
 	"os"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
-	"github.com/aws/aws-sdk-go-v2/credentials"
+	"github.com/aws/aws-sdk-go-v2/config"
 	"github.com/aws/aws-sdk-go-v2/service/sqs"
 	sqsTypes "github.com/aws/aws-sdk-go-v2/service/sqs/types"
 	sinksdk "github.com/numaproj/numaflow-go/pkg/sinker"
@@ -28,60 +28,44 @@ import (
 	"go.uber.org/zap"
 )
 
+var (
+	SQSQueueName   = "AWS_SQS_QUEUE_NAME"
+	awsEndpointURL = "AWS_ENDPOINT_URL"
+)
+
 type awsSQSSink struct {
-	logger          *zap.SugaredLogger
-	sqsClient       *sqs.Client
-	queueName       string
-	region          string
-	awsAccessKey    string
-	awsAccessSecret string
-	awsBaseEndpoint string
+	logger    *zap.SugaredLogger
+	sqsClient *sqs.Client
 }
 
-// newAWSSQSSink will read the environment variable required to authenticate aws and publish data to SQS
-func newAWSSQSSink() *awsSQSSink {
+// awsSQSClient will generate the aws sqs client with default aws config.
+func awsSQSClient(ctx context.Context) *awsSQSSink {
+	// initialize the logger
 	logger := logging.NewLogger().Named("aws-sqs-sink")
-	queueName, ok := os.LookupEnv("AWS_SQS_QUEUE_NAME")
-	if !ok {
-		logger.Fatalln("AWS_SQS_QUEUE_NAME not found")
+
+	// Load default configs for aws based on env variable provided based on
+	// https://aws.github.io/aws-sdk-go-v2/docs/configuring-sdk/#specifying-credentials
+	cfg, err := config.LoadDefaultConfig(ctx)
+	if err != nil {
+		logger.Fatalln("failed loading aws config, err: ", err)
 	}
-	region, ok := os.LookupEnv("AWS_REGION")
-	if !ok {
-		logger.Fatalln("AWS_REGION not found")
-	}
-	accessKey, ok := os.LookupEnv("AWS_ACCESS_KEY")
-	if !ok {
-		logger.Fatalln("AWS_ACCESS_KEY not found")
-	}
-	accessSecret, ok := os.LookupEnv("AWS_ACCESS_SECRET")
-	if !ok {
-		logger.Fatalln("AWS_ACCESS_SECRET not found")
+
+	// generate the sqs client based on default values or if AWS_ENDPOINT_URL is passed as env.
+	awsEndpoint := os.Getenv(awsEndpointURL)
+
+	var client *sqs.Client
+	if awsEndpoint != "" {
+		client = sqs.NewFromConfig(cfg, func(options *sqs.Options) {
+			options.BaseEndpoint = aws.String(awsEndpoint)
+		})
+	} else {
+		client = sqs.NewFromConfig(cfg)
 	}
 
 	return &awsSQSSink{
-		logger:          logger,
-		queueName:       queueName,
-		region:          region,
-		awsAccessKey:    accessKey,
-		awsAccessSecret: accessSecret,
-		awsBaseEndpoint: os.Getenv("AWS_BASE_ENDPOINT"),
+		logger:    logger,
+		sqsClient: client,
 	}
-}
-
-// awsSQSClient will generate the aws sqs client using access_key, access_secret and region.
-func (s *awsSQSSink) awsSQSClient() *sqs.Client {
-	config := aws.Config{
-		Region:      s.region,
-		Credentials: credentials.NewStaticCredentialsProvider(s.awsAccessKey, s.awsAccessSecret, ""),
-	}
-
-	if s.awsBaseEndpoint != "" {
-		return sqs.NewFromConfig(config, func(options *sqs.Options) {
-			options.BaseEndpoint = aws.String(s.awsBaseEndpoint)
-		})
-	}
-
-	return sqs.NewFromConfig(config)
 }
 
 // Sink will publish the vertex data to aws sqs sink
@@ -89,25 +73,23 @@ func (s *awsSQSSink) Sink(ctx context.Context, datumStreamCh <-chan sinksdk.Datu
 	ok := sinksdk.ResponsesBuilder()
 
 	// generate the queue url to publish data to queue via queue name.
-	queueURL, err := s.sqsClient.GetQueueUrl(ctx, &sqs.GetQueueUrlInput{QueueName: &s.queueName})
+	queueURL, err := s.sqsClient.GetQueueUrl(ctx, &sqs.GetQueueUrlInput{QueueName: aws.String(os.Getenv(SQSQueueName))})
 	if err != nil {
 		s.logger.Fatalln("failed to generate SQS Queue url, err: ", err)
 	}
 
 	// generate message request entries for processing message in a batch
-	requestEntries := make([]sqsTypes.SendMessageBatchRequestEntry, len(datumStreamCh))
-	count := 0
+	var messageRequests []sqsTypes.SendMessageBatchRequestEntry
 	for datum := range datumStreamCh {
-		requestEntries[count] = sqsTypes.SendMessageBatchRequestEntry{
+		messageRequests = append(messageRequests, sqsTypes.SendMessageBatchRequestEntry{
 			Id:          aws.String(datum.ID()),
 			MessageBody: aws.String(string(datum.Value())),
-		}
-		count++
+		})
 	}
 
 	// send batch message to aws queue
 	response, err := s.sqsClient.SendMessageBatch(ctx, &sqs.SendMessageBatchInput{
-		Entries:  requestEntries,
+		Entries:  messageRequests,
 		QueueUrl: queueURL.QueueUrl,
 	})
 	if err != nil {
@@ -128,14 +110,13 @@ func (s *awsSQSSink) Sink(ctx context.Context, datumStreamCh <-chan sinksdk.Datu
 }
 
 func main() {
-	// generate aws sqs sink configuration using aws_access_key, aws_access_secret, region and queue_name.
-	config := newAWSSQSSink()
+	ctx := context.Background()
 
-	// generate aws sqs client using region, aws_access_key and aws_access_secret, used for push data to queue.
-	config.sqsClient = config.awsSQSClient()
+	// generate aws sqs queue client based on provided config.
+	configs := awsSQSClient(ctx)
 
 	// start a new sink server which will push data to aws sqs queue.
-	if err := sinksdk.NewServer(config).Start(context.Background()); err != nil {
-		config.logger.Fatalln("failed to start aws sqs sink server, err: %v", err)
+	if err := sinksdk.NewServer(configs).Start(ctx); err != nil {
+		configs.logger.Fatalln("failed to start aws sqs sink server, err: %v", err)
 	}
 }
