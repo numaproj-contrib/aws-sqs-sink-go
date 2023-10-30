@@ -22,6 +22,7 @@ import (
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/credentials"
 	"github.com/aws/aws-sdk-go-v2/service/sqs"
+	sqsTypes "github.com/aws/aws-sdk-go-v2/service/sqs/types"
 	sinksdk "github.com/numaproj/numaflow-go/pkg/sinker"
 	"github.com/numaproj/numaflow/pkg/shared/logging"
 	"go.uber.org/zap"
@@ -93,18 +94,34 @@ func (s *awsSQSSink) Sink(ctx context.Context, datumStreamCh <-chan sinksdk.Datu
 		s.logger.Fatalln("failed to generate SQS Queue url, err: ", err)
 	}
 
-	// range over data stream and publish data to aws sqs queue
+	// generate message request entries for processing message in a batch
+	requestEntries := make([]sqsTypes.SendMessageBatchRequestEntry, len(datumStreamCh))
+	count := 0
 	for datum := range datumStreamCh {
-		msgBody := string(datum.Value())
-		if _, err = s.sqsClient.SendMessage(ctx, &sqs.SendMessageInput{
-			MessageBody: &msgBody,
-			QueueUrl:    queueURL.QueueUrl,
-		}); err != nil {
-			s.logger.Errorf("failed to push message %v", err)
-			continue
+		requestEntries[count] = sqsTypes.SendMessageBatchRequestEntry{
+			Id:          aws.String(datum.ID()),
+			MessageBody: aws.String(string(datum.Value())),
 		}
+		count++
+	}
 
-		ok = ok.Append(sinksdk.ResponseOK(datum.ID()))
+	// send batch message to aws queue
+	response, err := s.sqsClient.SendMessageBatch(ctx, &sqs.SendMessageBatchInput{
+		Entries:  requestEntries,
+		QueueUrl: queueURL.QueueUrl,
+	})
+	if err != nil {
+		s.logger.Errorf("failed to push message %v", err)
+	} else {
+		// check for response in case of partial failure, then log those responses otherwise return id of success request.
+		if len(response.Failed) > 0 {
+			s.logger.Error("failed to push message, err: %v", response.Failed)
+		}
+		if len(response.Successful) > 0 {
+			for _, success := range response.Successful {
+				ok = ok.Append(sinksdk.ResponseOK(aws.ToString(success.Id)))
+			}
+		}
 	}
 
 	return ok

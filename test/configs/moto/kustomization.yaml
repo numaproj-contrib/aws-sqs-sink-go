@@ -2,6 +2,6 @@
 resources:
   - moto.yaml
 
-#commonLabels:
-#  "numaflow-e2e": "true"
+commonLabels:
+  "numaflow-e2e": "true"
 

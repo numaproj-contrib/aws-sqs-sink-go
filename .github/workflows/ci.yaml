@@ -106,7 +106,7 @@ jobs:
       - name: "Step 6: Load image in cluster"
         run: |
           docker load --input /tmp/aws-sqs-queue.tar
-          kind load docker-image "quay.io/numaio/numaproj-contrib/aws-sqs-sink-go:sqs-e2e"
+          k3d image import "quay.io/numaio/numaproj-contrib/aws-sqs-sink-go:sqs-e2e"
 
       - name: "Step 7: Install Numaflow"
         env:
