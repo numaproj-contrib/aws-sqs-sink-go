@@ -38,9 +38,10 @@ func (a *AWSSQSSuite) TestAWSSQSSinkPipeline() {
 	a.T().Log("port forwarding moto service")
 	stopPortForward := a.StartPortForward("moto-0", 5000)
 
-	client := awsSQSClient("us-east-1", "testing", "testing", "testing")
+	client, err := awsSQSClient(ctx)
+	a.NoError(err)
 
-	err := client.createSQSQueue(ctx)
+	err = client.createSQSQueue(ctx, "testing")
 	a.NoError(err)
 	a.T().Log("sqs queue is created!!!")
 
@@ -54,7 +55,7 @@ func (a *AWSSQSSuite) TestAWSSQSSinkPipeline() {
 
 	// Check for message in aws queue, it will retry for 10 times with 2-second sleep,
 	// if message is available then it will return true otherwise false
-	containMsg, err := client.isQueueContainMessages(ctx)
+	containMsg, err := client.isQueueContainMessages(ctx, "testing")
 	a.NoError(err)
 
 	a.True(containMsg)

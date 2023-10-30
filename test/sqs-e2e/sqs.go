@@ -20,43 +20,43 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"github.com/aws/aws-sdk-go-v2/aws"
-	"github.com/aws/aws-sdk-go-v2/credentials"
-	"github.com/aws/aws-sdk-go-v2/service/sqs"
+	"os"
 	"time"
+
+	"github.com/aws/aws-sdk-go-v2/aws"
+	"github.com/aws/aws-sdk-go-v2/config"
+	"github.com/aws/aws-sdk-go-v2/service/sqs"
 )
 
 type sqsClient struct {
-	client    *sqs.Client
-	queueName string
+	client *sqs.Client
 }
 
-func (s *sqsClient) createSQSQueue(ctx context.Context) error {
-	if _, err := s.client.CreateQueue(ctx, &sqs.CreateQueueInput{QueueName: aws.String(s.queueName)}); err != nil {
+func (s *sqsClient) createSQSQueue(ctx context.Context, queueName string) error {
+	if _, err := s.client.CreateQueue(ctx, &sqs.CreateQueueInput{QueueName: aws.String(queueName)}); err != nil {
 		return err
 	}
 
 	return nil
 }
 
-func awsSQSClient(region, accessKey, accessSecret, queueName string) *sqsClient {
-	awsConfig := aws.Config{
-		Region:      region,
-		Credentials: credentials.NewStaticCredentialsProvider(accessKey, accessSecret, ""),
+func awsSQSClient(ctx context.Context) (*sqsClient, error) {
+	cfg, err := config.LoadDefaultConfig(ctx)
+	if err != nil {
+		return nil, err
 	}
 
-	client := sqs.NewFromConfig(awsConfig, func(options *sqs.Options) {
-		options.BaseEndpoint = aws.String("http://localhost:5000")
+	client := sqs.NewFromConfig(cfg, func(options *sqs.Options) {
+		options.BaseEndpoint = aws.String(os.Getenv("AWS_ENDPOINT_URL"))
 	})
 
 	return &sqsClient{
-		client:    client,
-		queueName: queueName,
-	}
+		client: client,
+	}, nil
 }
 
-func (s *sqsClient) isQueueContainMessages(ctx context.Context) (bool, error) {
-	queueURL, err := s.client.GetQueueUrl(ctx, &sqs.GetQueueUrlInput{QueueName: aws.String(s.queueName)})
+func (s *sqsClient) isQueueContainMessages(ctx context.Context, queueName string) (bool, error) {
+	queueURL, err := s.client.GetQueueUrl(ctx, &sqs.GetQueueUrlInput{QueueName: aws.String(queueName)})
 	if err != nil {
 		return false, err
 	}

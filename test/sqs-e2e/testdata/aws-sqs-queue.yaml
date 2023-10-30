@@ -22,10 +22,10 @@ spec:
       sink:
         udsink:
           container:
-            image: quay.io/numaio/numaproj-contrib/aws-sqs-sink-go:v6
+            image: quay.io/numaio/numaproj-contrib/aws-sqs-sink-go:sqs-e2e
             env:
               - name: AWS_SQS_QUEUE_NAME
-                value: "test"
+                value: "testing"
               - name: AWS_REGION
                 value: "us-east-1"
               - name: AWS_ACCESS_KEY_ID
@@ -33,7 +33,7 @@ spec:
               - name: AWS_SECRET_ACCESS_KEY
                 value: "testing" # ## This can be passed as k8s secret as well
               - name: AWS_ENDPOINT_URL
-                value: "http://moto.default.svc.cluster.local:5000"
+                value: "http://moto.numaflow-system.svc.cluster.local:5000"
   edges:
     - from: in
       to: cat
