@@ -96,13 +96,9 @@ func (s *awsSQSSink) Sink(ctx context.Context, datumStreamCh <-chan sinksdk.Datu
 		s.logger.Errorf("failed to push message %v", err)
 	}
 
-	// log the failure response and append that to responses object.
-	if len(response.Failed) > 0 {
-		s.logger.Error("failed to push message, err: %v", response.Failed)
-
-		for _, fail := range response.Failed {
-			responses = responses.Append(sinksdk.ResponseFailure(aws.ToString(fail.Id), "failed to push message"))
-		}
+	// append the failure response to responses object
+	for _, fail := range response.Failed {
+		responses = responses.Append(sinksdk.ResponseFailure(aws.ToString(fail.Id), "failed to push message"))
 	}
 
 	// append the success response to responses object
