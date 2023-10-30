@@ -96,29 +96,29 @@ jobs:
           echo /home/runner/go/bin >> $GITHUB_PATH
           echo /usr/local/bin >> $GITHUB_PATH
 
-      - name: "Step 5: Create a registry and a cluster"
+      - name: "Step 5: Install k3d"
+        run: curl -s https://raw.githubusercontent.com/k3d-io/k3d/main/install.sh | bash
+
+      - name: "Step 6: Create a registry and a cluster"
         run: |
           k3d registry create e2e-registry --port 5111
           k3d cluster create e2e --registry-use k3d-e2e-registry:5111
           k3d kubeconfig get e2e > ~/.kube/numaflow-e2e-config
           echo '127.0.0.1 k3d-e2e-registry' | sudo tee -a /etc/hosts
 
-      - name: "Step 6: Load image in cluster"
+      - name: "Step 7: Load image in cluster"
         run: |
-          docker load --input /tmp/aws-sqs-queue.tar
-          k3d image import "quay.io/numaio/numaproj-contrib/aws-sqs-sink-go:sqs-e2e"
+          docker load --input /tmp/aws-sqs-queue-image.tar
+          k3d image import "quay.io/numaio/numaproj-contrib/aws-sqs-sink-go:sqs-e2e" --cluster e2e
 
-      - name: "Step 7: Install Numaflow"
-        env:
-          KUBECONFIG: "~/.kube/numaflow-e2e-config"
-        run: make install-numaflow
+      - name: "Step 8: Install Numaflow"
+        run: KUBECONFIG=~/.kube/numaflow-e2e-config make install-numaflow
 
-      - name: "step 8: Run E2E tests"
+      - name: "step 9: Run E2E tests"
         env:
-          KUBECONFIG: "~/.kube/numaflow-e2e-config"
           # These values are for moto configuration, ref: https://docs.getmoto.org/en/latest/
           AWS_REGION: "us-east-1"
           AWS_ACCESS_KEY_ID: "testing"
           AWS_SECRET_ACCESS_KEY: "testing"
           AWS_ENDPOINT_URL: "http://localhost:5000"
-        run: make test-e2e
+        run: KUBECONFIG=~/.kube/numaflow-e2e-config make test-e2e

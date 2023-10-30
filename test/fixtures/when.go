@@ -39,11 +39,6 @@ type When struct {
 	pipeline       *dfv1.Pipeline
 	restConfig     *rest.Config
 	kubeClient     kubernetes.Interface
-
-	portForwarderStopChannels map[string]chan struct{}
-	// Key: vertex label selector
-	// Value: the ip of, one of the pods matching the label selector
-	vertexToPodIpMapping map[string]string
 }
 
 func (w *When) CreateISBSvc() *When {
