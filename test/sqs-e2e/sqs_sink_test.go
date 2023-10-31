@@ -1,5 +1,3 @@
-//go:build test
-
 /*
 Copyright 2023 The Numaproj Authors.
 
@@ -20,6 +18,7 @@ package sqs_e2e
 
 import (
 	"context"
+	"fmt"
 	"testing"
 	"time"
 
@@ -34,6 +33,15 @@ type AWSSQSSuite struct {
 func (a *AWSSQSSuite) TestAWSSQSSinkPipeline() {
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Minute)
 	defer cancel()
+
+	// Create Moto resources used for mocking aws APIs.
+	deleteCMD := fmt.Sprintf("kubectl delete -k ../configs/moto -n %s --ignore-not-found=true", Namespace)
+	a.Given().When().Exec("sh", []string{"-c", deleteCMD}, OutputRegexp(""))
+	createCMD := fmt.Sprintf("kubectl apply -k ../configs/moto -n %s", Namespace)
+	a.Given().When().Exec("sh", []string{"-c", createCMD}, OutputRegexp("service/moto created"))
+	labelSelector := fmt.Sprintf("app=%s", "moto")
+	a.Given().When().WaitForStatefulSetReady(labelSelector)
+	a.T().Log("Moto resources are ready")
 
 	a.T().Log("port forwarding moto service")
 	stopPortForward := a.StartPortForward("moto-0", 5000)
