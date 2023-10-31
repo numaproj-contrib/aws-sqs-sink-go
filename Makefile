@@ -20,6 +20,10 @@ lint:
 	go mod tidy
 	golangci-lint run --fix --verbose --concurrency 4 --timeout 5m
 
+.PHONY: test
+test:
+	go test $(shell go list ./... | grep -v /aws-sqs-sink-go/test/) -race -short -v -timeout 60s
+
 clean:
 	-rm -rf ./dist
 
