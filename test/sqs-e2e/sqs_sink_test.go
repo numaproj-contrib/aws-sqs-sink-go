@@ -32,18 +32,22 @@ type AWSSQSSuite struct {
 	E2ESuite
 }
 
-func (a *AWSSQSSuite) TestAWSSQSSinkPipeline() {
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Minute)
-	defer cancel()
-
+func (a *AWSSQSSuite) SetupTest() {
 	// Create Moto resources used for mocking aws APIs.
 	deleteCMD := fmt.Sprintf("kubectl delete -k ../configs/moto -n %s --ignore-not-found=true", Namespace)
-	a.Given().When().Exec("sh", []string{"-c", deleteCMD}, OutputRegexp(""))
+	a.Given().When().Exec("sh", []string{"-c", deleteCMD}, OutputRegexp("")).Wait(5 * time.Second)
+
 	createCMD := fmt.Sprintf("kubectl apply -k ../configs/moto -n %s", Namespace)
-	a.Given().When().Exec("sh", []string{"-c", createCMD}, OutputRegexp("service/moto created"))
+	a.Given().When().Exec("sh", []string{"-c", createCMD}, OutputRegexp("statefulset.apps/moto created")).Wait(5 * time.Second)
+
 	labelSelector := fmt.Sprintf("app=%s", "moto")
 	a.Given().When().WaitForStatefulSetReady(labelSelector)
 	a.T().Log("Moto resources are ready")
+}
+
+func (a *AWSSQSSuite) TestAWSSQSSinkPipeline() {
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Minute)
+	defer cancel()
 
 	a.T().Log("port forwarding moto service")
 	stopPortForward := a.StartPortForward("moto-0", 5000)
